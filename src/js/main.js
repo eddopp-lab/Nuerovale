@@ -1,31 +1,43 @@
-/* ─── Neurovale — Main 3D Scene Script ──────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────
+   Neurovale — Three.js Scenes + UI Logic
+   Skill applied: ui-ux-pro-max
+     · transform/opacity animations only (no width/height)
+     · prefers-reduced-motion respected
+     · 150-300ms micro-interactions
+     · No emoji icons (SVG only)
+───────────────────────────────────────────────────────────────────────── */
 
 const { THREE } = window;
+
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function rand(min, max) { return Math.random() * (max - min) + min; }
 function lerp(a, b, t)  { return a + (b - a) * t; }
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  1. HERO — Neural Network Particle Field                                   */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   1. HERO — 3D Neural Network (OLED palette: #00e5ff nodes, #7c3aed lines)
+──────────────────────────────────────────────────────────────────────── */
 (function initHero() {
-  const canvas   = document.getElementById('hero-canvas');
+  const canvas = document.getElementById('hero-canvas');
+  if (!canvas) return;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
 
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-  camera.position.z = 350;
+  camera.position.z = 360;
 
-  const NODE_COUNT = 900;
-  const positions  = new Float32Array(NODE_COUNT * 3);
-  const nodeData   = [];
+  /* Nodes */
+  const N = REDUCED ? 200 : 900;
+  const positions = new Float32Array(N * 3);
+  const nodeData  = [];
 
-  for (let i = 0; i < NODE_COUNT; i++) {
+  for (let i = 0; i < N; i++) {
     const theta = rand(0, Math.PI * 2);
     const phi   = Math.acos(rand(-1, 1));
-    const r     = rand(60, 200);
+    const r     = rand(60, 210);
     const x = r * Math.sin(phi) * Math.cos(theta);
     const y = r * Math.sin(phi) * Math.sin(theta);
     const z = r * Math.cos(phi);
@@ -35,36 +47,39 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
     nodeData.push({ ox: x, oy: y, oz: z, speed: rand(0.3, 1.2), phase: rand(0, Math.PI * 2) });
   }
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const mat = new THREE.PointsMaterial({ size: 2.2, color: 0x00e5ff, transparent: true, opacity: 0.75, sizeAttenuation: true });
-  const points = new THREE.Points(geo, mat);
+  const ptGeo = new THREE.BufferGeometry();
+  ptGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const ptMat = new THREE.PointsMaterial({ size: 2.0, color: 0x00e5ff, transparent: true, opacity: 0.8, sizeAttenuation: true });
+  const points = new THREE.Points(ptGeo, ptMat);
   scene.add(points);
 
-  const lineMat   = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.06 });
-  const lineGroup = new THREE.Group();
-  scene.add(lineGroup);
+  /* Edges */
+  const lineGrp = new THREE.Group();
+  scene.add(lineGrp);
 
-  const CONNECT_DIST = 70;
-  for (let i = 0; i < NODE_COUNT; i++) {
-    for (let j = i + 1; j < NODE_COUNT; j++) {
-      const dx = nodeData[i].ox - nodeData[j].ox;
-      const dy = nodeData[i].oy - nodeData[j].oy;
-      const dz = nodeData[i].oz - nodeData[j].oz;
-      if (Math.sqrt(dx*dx + dy*dy + dz*dz) < CONNECT_DIST) {
-        const lg = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(nodeData[i].ox, nodeData[i].oy, nodeData[i].oz),
-          new THREE.Vector3(nodeData[j].ox, nodeData[j].oy, nodeData[j].oz),
-        ]);
-        lineGroup.add(new THREE.Line(lg, lineMat));
+  if (!REDUCED) {
+    const lMat = new THREE.LineBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.07 });
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const dx = nodeData[i].ox - nodeData[j].ox;
+        const dy = nodeData[i].oy - nodeData[j].oy;
+        const dz = nodeData[i].oz - nodeData[j].oz;
+        if (dx*dx + dy*dy + dz*dz < 5000) {
+          const g = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(nodeData[i].ox, nodeData[i].oy, nodeData[i].oz),
+            new THREE.Vector3(nodeData[j].ox, nodeData[j].oy, nodeData[j].oz),
+          ]);
+          lineGrp.add(new THREE.Line(g, lMat));
+        }
       }
     }
   }
 
-  const mouse = { x: 0, y: 0 };
-  document.addEventListener('mousemove', e => {
-    mouse.x = (e.clientX / window.innerWidth  - 0.5) * 2;
-    mouse.y = (e.clientY / window.innerHeight - 0.5) * 2;
+  /* Mouse parallax */
+  const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+  window.addEventListener('mousemove', e => {
+    mouse.tx = (e.clientX / window.innerWidth  - 0.5) * 2;
+    mouse.ty = (e.clientY / window.innerHeight - 0.5) * 2;
   });
 
   function resize() {
@@ -78,40 +93,49 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   window.addEventListener('resize', resize);
 
   let t = 0;
+  const pos = ptGeo.attributes.position;
   function animate() {
     requestAnimationFrame(animate);
-    t += 0.008;
-    const pos = geo.attributes.position;
-    for (let i = 0; i < NODE_COUNT; i++) {
-      const nd   = nodeData[i];
-      const wave = 1 + 0.04 * Math.sin(t * nd.speed + nd.phase);
-      pos.setXYZ(i, nd.ox * wave, nd.oy * wave, nd.oz * wave);
+    if (REDUCED) { renderer.render(scene, camera); return; }
+
+    t += 0.007;
+    mouse.x = lerp(mouse.x, mouse.tx, 0.05);
+    mouse.y = lerp(mouse.y, mouse.ty, 0.05);
+
+    for (let i = 0; i < N; i++) {
+      const d    = nodeData[i];
+      const wave = 1 + 0.035 * Math.sin(t * d.speed + d.phase);
+      pos.setXYZ(i, d.ox * wave, d.oy * wave, d.oz * wave);
     }
     pos.needsUpdate = true;
-    points.rotation.y = t * 0.06 + mouse.x * 0.15;
-    points.rotation.x = mouse.y * 0.08;
-    lineGroup.rotation.y = points.rotation.y;
-    lineGroup.rotation.x = points.rotation.x;
+
+    points.rotation.y   = t * 0.055 + mouse.x * 0.12;
+    points.rotation.x   = mouse.y * 0.07;
+    lineGrp.rotation.y  = points.rotation.y;
+    lineGrp.rotation.x  = points.rotation.x;
+
     renderer.render(scene, camera);
   }
   animate();
 })();
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  2. ABOUT BG — Torus Knot Wireframe                                        */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   2. ABOUT BG — slow torus-knot wireframe (cyan, very faint)
+──────────────────────────────────────────────────────────────────────── */
 (function initAboutBg() {
-  const canvas   = document.getElementById('about-canvas');
+  const canvas = document.getElementById('about-canvas');
+  if (!canvas) return;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
 
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-  camera.position.z = 400;
+  camera.position.z = 420;
 
-  const g = new THREE.TorusKnotGeometry(120, 36, 200, 20);
-  const m = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.07 });
+  const g = new THREE.TorusKnotGeometry(130, 38, 180, 18);
+  const m = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.055 });
   const torus = new THREE.Mesh(g, m);
   scene.add(torus);
 
@@ -128,58 +152,61 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   let t = 0;
   function animate() {
     requestAnimationFrame(animate);
-    t += 0.005;
-    torus.rotation.x = t * 0.3;
-    torus.rotation.y = t * 0.2;
+    if (!REDUCED) { t += 0.004; }
+    torus.rotation.x = t * 0.28;
+    torus.rotation.y = t * 0.18;
     renderer.render(scene, camera);
   }
   animate();
 })();
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  3. BRAIN CARD — Layered Wireframe Icosahedra                              */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   3. BRAIN CARD — layered wireframe icosahedra + pulse ring
+──────────────────────────────────────────────────────────────────────── */
 (function initBrain() {
-  const canvas   = document.getElementById('brain-canvas');
+  const canvas = document.getElementById('brain-canvas');
+  if (!canvas) return;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
 
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
-  camera.position.z = 3.5;
+  camera.position.z = 3.6;
 
-  function addShell(radius, detail, color, opacity) {
-    const g = new THREE.IcosahedronGeometry(radius, detail);
-    const m = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity });
-    const mesh = new THREE.Mesh(g, m);
+  function shell(r, d, color, op) {
+    const m = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: op });
+    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(r, d), m);
     scene.add(mesh);
     return mesh;
   }
 
-  const outer = addShell(1.3,  3, 0x00e5ff, 0.12);
-  const mid   = addShell(1.05, 3, 0x7c3aed, 0.18);
-  const inner = addShell(0.75, 2, 0x00e5ff, 0.28);
-  const core  = addShell(0.38, 1, 0xe040fb, 0.5);
+  const outer = shell(1.32, 3, 0x00e5ff, 0.1);
+  const mid   = shell(1.06, 3, 0x7c3aed, 0.16);
+  const inner = shell(0.76, 2, 0x00e5ff, 0.25);
+  const core  = shell(0.38, 1, 0x22c55e, 0.55);
 
+  /* Surface nodes */
   const nodePts = [];
   for (let i = 0; i < 200; i++) {
     const phi   = Math.acos(1 - 2 * Math.random());
     const theta = Math.random() * Math.PI * 2;
-    const r = rand(0.7, 1.35);
+    const r = rand(0.72, 1.36);
     nodePts.push(new THREE.Vector3(
       r * Math.sin(phi) * Math.cos(theta),
       r * Math.sin(phi) * Math.sin(theta),
       r * Math.cos(phi)
     ));
   }
-  const ptGeo = new THREE.BufferGeometry().setFromPoints(nodePts);
-  const ptMat = new THREE.PointsMaterial({ size: 0.035, color: 0x00e5ff, transparent: true, opacity: 0.9 });
-  const pts   = new THREE.Points(ptGeo, ptMat);
+  const ptsGeo = new THREE.BufferGeometry().setFromPoints(nodePts);
+  const ptsMat = new THREE.PointsMaterial({ size: 0.032, color: 0x00e5ff, transparent: true, opacity: 0.85 });
+  const pts    = new THREE.Points(ptsGeo, ptsMat);
   scene.add(pts);
 
-  const ringGeo = new THREE.RingGeometry(1.0, 1.05, 64);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+  /* Pulse ring — green (CTA color) */
+  const ringGeo = new THREE.RingGeometry(1.0, 1.04, 64);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
   const ring    = new THREE.Mesh(ringGeo, ringMat);
   scene.add(ring);
 
@@ -196,30 +223,35 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   let t = 0;
   function animate() {
     requestAnimationFrame(animate);
-    t += 0.012;
-    outer.rotation.y = t * 0.18;
-    outer.rotation.x = Math.sin(t * 0.22) * 0.3;
-    mid.rotation.y   = -t * 0.26;
-    mid.rotation.x   = Math.cos(t * 0.2) * 0.25;
-    inner.rotation.y = t * 0.38;
-    inner.rotation.z = t * 0.15;
-    core.rotation.y  = -t * 0.5;
-    pts.rotation.y   = t * 0.2;
-    const pulse = 0.9 + 0.15 * Math.sin(t * 2.2);
-    ring.scale.set(pulse, pulse, 1);
-    ringMat.opacity  = 0.15 + 0.15 * Math.sin(t * 2.2);
-    ring.rotation.x  = t * 0.3;
-    ring.rotation.z  = t * 0.15;
+    t += REDUCED ? 0 : 0.011;
+
+    outer.rotation.y = t * 0.16;
+    outer.rotation.x = Math.sin(t * 0.2) * 0.28;
+    mid.rotation.y   = -t * 0.24;
+    mid.rotation.x   = Math.cos(t * 0.18) * 0.22;
+    inner.rotation.y = t * 0.36;
+    inner.rotation.z = t * 0.14;
+    core.rotation.y  = -t * 0.48;
+    pts.rotation.y   = t * 0.18;
+
+    const p = 0.9 + 0.14 * Math.sin(t * 2.0);
+    ring.scale.set(p, p, 1);
+    ringMat.opacity = 0.15 + 0.15 * Math.sin(t * 2.0);
+    ring.rotation.x = t * 0.28;
+    ring.rotation.z = t * 0.14;
+
     renderer.render(scene, camera);
   }
   animate();
 })();
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  4. RESEARCH — Flowing Particle Field                                       */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   4. RESEARCH — violet flowing particles
+──────────────────────────────────────────────────────────────────────── */
 (function initResearch() {
-  const canvas   = document.getElementById('research-canvas');
+  const canvas = document.getElementById('research-canvas');
+  if (!canvas) return;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
@@ -228,21 +260,20 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
   camera.position.z = 300;
 
-  const COUNT = 600;
-  const positions  = new Float32Array(COUNT * 3);
-  const velocities = [];
+  const C  = 500;
+  const pa = new Float32Array(C * 3);
+  const va = [];
 
-  for (let i = 0; i < COUNT; i++) {
-    positions[i*3]   = rand(-300, 300);
-    positions[i*3+1] = rand(-300, 300);
-    positions[i*3+2] = rand(-200, 200);
-    velocities.push({ vx: rand(-0.4, 0.4), vy: rand(-0.4, 0.4), vz: rand(-0.2, 0.2) });
+  for (let i = 0; i < C; i++) {
+    pa[i*3]   = rand(-300, 300);
+    pa[i*3+1] = rand(-300, 300);
+    pa[i*3+2] = rand(-150, 150);
+    va.push({ vx: rand(-0.35, 0.35), vy: rand(-0.35, 0.35), vz: rand(-0.15, 0.15) });
   }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const mat = new THREE.PointsMaterial({ size: 1.8, color: 0x7c3aed, transparent: true, opacity: 0.65 });
-  scene.add(new THREE.Points(geo, mat));
+  geo.setAttribute('position', new THREE.BufferAttribute(pa, 3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.6, color: 0x7c3aed, transparent: true, opacity: 0.6 })));
 
   function resize() {
     const w = canvas.parentElement.clientWidth;
@@ -257,65 +288,72 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   const pos = geo.attributes.position;
   function animate() {
     requestAnimationFrame(animate);
-    for (let i = 0; i < COUNT; i++) {
-      pos.array[i*3]   += velocities[i].vx;
-      pos.array[i*3+1] += velocities[i].vy;
-      pos.array[i*3+2] += velocities[i].vz;
-      if (pos.array[i*3]   >  300) pos.array[i*3]   = -300;
-      if (pos.array[i*3]   < -300) pos.array[i*3]   =  300;
-      if (pos.array[i*3+1] >  300) pos.array[i*3+1] = -300;
-      if (pos.array[i*3+1] < -300) pos.array[i*3+1] =  300;
-      if (pos.array[i*3+2] >  200) pos.array[i*3+2] = -200;
-      if (pos.array[i*3+2] < -200) pos.array[i*3+2] =  200;
+    if (!REDUCED) {
+      for (let i = 0; i < C; i++) {
+        pos.array[i*3]   += va[i].vx;
+        pos.array[i*3+1] += va[i].vy;
+        pos.array[i*3+2] += va[i].vz;
+        if (pos.array[i*3]   >  300) pos.array[i*3]   = -300;
+        if (pos.array[i*3]   < -300) pos.array[i*3]   =  300;
+        if (pos.array[i*3+1] >  300) pos.array[i*3+1] = -300;
+        if (pos.array[i*3+1] < -300) pos.array[i*3+1] =  300;
+        if (pos.array[i*3+2] >  150) pos.array[i*3+2] = -150;
+        if (pos.array[i*3+2] < -150) pos.array[i*3+2] =  150;
+      }
+      pos.needsUpdate = true;
     }
-    pos.needsUpdate = true;
     renderer.render(scene, camera);
   }
   animate();
 })();
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  5. CONTACT — Perspective Grid Plane with Floating Orbs                    */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   5. CONTACT — perspective grid + floating orbs
+──────────────────────────────────────────────────────────────────────── */
 (function initContact() {
-  const canvas   = document.getElementById('contact-canvas');
+  const canvas = document.getElementById('contact-canvas');
+  if (!canvas) return;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
 
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
-  camera.position.set(0, 180, 300);
+  camera.position.set(0, 190, 310);
   camera.lookAt(0, 0, 0);
 
-  const GRID = 30, STEP = 30, HALF = (GRID * STEP) / 2;
+  const GRID = 28, STEP = 32, HALF = (GRID * STEP) / 2;
+  const accent = [0x00e5ff, 0x22c55e];
 
   for (let i = 0; i <= GRID; i++) {
-    const x = i * STEP - HALF;
-    const c = i % 5 === 0 ? 0x00e5ff : 0x1a2540;
-    const op = i % 5 === 0 ? 0.3 : 0.12;
-    const g = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(x, 0, -HALF), new THREE.Vector3(x, 0, HALF),
-    ]);
+    const x  = i * STEP - HALF;
+    const c  = i % 5 === 0 ? accent[0] : 0x111118;
+    const op = i % 5 === 0 ? 0.28 : 0.1;
+    const g  = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0,-HALF), new THREE.Vector3(x,0,HALF)]);
     scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: op })));
   }
   for (let j = 0; j <= GRID; j++) {
-    const z = j * STEP - HALF;
-    const c = j % 5 === 0 ? 0x7c3aed : 0x1a2540;
-    const op = j % 5 === 0 ? 0.3 : 0.12;
-    const g = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-HALF, 0, z), new THREE.Vector3(HALF, 0, z),
-    ]);
+    const z  = j * STEP - HALF;
+    const c  = j % 5 === 0 ? 0x7c3aed : 0x111118;
+    const op = j % 5 === 0 ? 0.28 : 0.1;
+    const g  = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-HALF,0,z), new THREE.Vector3(HALF,0,z)]);
     scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: op })));
   }
 
-  for (let k = 0; k < 10; k++) {
-    const g    = new THREE.SphereGeometry(rand(2, 5), 8, 8);
-    const m    = new THREE.MeshBasicMaterial({ color: k % 2 === 0 ? 0x00e5ff : 0x7c3aed, transparent: true, opacity: 0.6 });
-    const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(rand(-HALF, HALF), rand(5, 40), rand(-HALF, HALF));
-    mesh.userData = { oy: mesh.position.y, speed: rand(0.5, 1.5), phase: rand(0, Math.PI * 2) };
+  /* Floating orbs — use skill accent colors */
+  const orbs = [];
+  const orbColors = [0x00e5ff, 0x7c3aed, 0x22c55e];
+  for (let k = 0; k < 12; k++) {
+    const r    = rand(2, 5);
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 8, 8),
+      new THREE.MeshBasicMaterial({ color: orbColors[k % 3], transparent: true, opacity: 0.55 })
+    );
+    mesh.position.set(rand(-HALF, HALF), rand(8, 45), rand(-HALF, HALF));
+    mesh.userData = { oy: mesh.position.y, speed: rand(0.5, 1.4), phase: rand(0, Math.PI * 2) };
     scene.add(mesh);
+    orbs.push(mesh);
   }
 
   function resize() {
@@ -331,108 +369,98 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   let t = 0;
   function animate() {
     requestAnimationFrame(animate);
-    t += 0.012;
-    scene.children.forEach(obj => {
-      if (obj.userData.speed) {
-        obj.position.y = obj.userData.oy + 8 * Math.sin(t * obj.userData.speed + obj.userData.phase);
-      }
-    });
-    camera.position.x = Math.sin(t * 0.08) * 80;
-    camera.lookAt(0, 0, 0);
+    if (!REDUCED) {
+      t += 0.011;
+      orbs.forEach(o => {
+        o.position.y = o.userData.oy + 9 * Math.sin(t * o.userData.speed + o.userData.phase);
+      });
+      camera.position.x = Math.sin(t * 0.07) * 70;
+      camera.lookAt(0, 0, 0);
+    }
     renderer.render(scene, camera);
   }
   animate();
 })();
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  6. Navbar scroll effect                                                    */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   6. Navbar — floating + scroll state
+──────────────────────────────────────────────────────────────────────── */
 const navbar = document.getElementById('navbar');
 window.addEventListener('scroll', () => {
-  navbar.classList.toggle('scrolled', window.scrollY > 40);
+  navbar.classList.toggle('scrolled', window.scrollY > 60);
 }, { passive: true });
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  7. Animated stat counters                                                  */
-/* ────────────────────────────────────────────────────────────────────────── */
-function animateCounter(el, target, duration = 1800) {
-  const start = performance.now();
+/* ────────────────────────────────────────────────────────────────────────
+   7. Mobile hamburger — a11y aware
+──────────────────────────────────────────────────────────────────────── */
+const hamburger  = document.getElementById('hamburger');
+const mobileMenu = document.getElementById('mobile-menu');
+
+hamburger.addEventListener('click', () => {
+  const open = !mobileMenu.hidden;
+  mobileMenu.hidden = open;
+  hamburger.setAttribute('aria-expanded', String(!open));
+});
+
+document.querySelectorAll('.mobile-link, .mobile-cta').forEach(el => {
+  el.addEventListener('click', () => {
+    mobileMenu.hidden = true;
+    hamburger.setAttribute('aria-expanded', 'false');
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────
+   8. Animated counters — ease-out cubic per skill
+──────────────────────────────────────────────────────────────────────── */
+function animCounter(el, target, ms = 1800) {
+  if (REDUCED) { el.textContent = target; return; }
+  const t0 = performance.now();
   function tick(now) {
-    const progress = Math.min((now - start) / duration, 1);
-    const ease = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.round(lerp(0, target, ease));
-    if (progress < 1) requestAnimationFrame(tick);
+    const p = Math.min((now - t0) / ms, 1);
+    const e = 1 - Math.pow(1 - p, 3);   /* ease-out cubic */
+    el.textContent = Math.round(e * target);
+    if (p < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
 }
 
-const heroObserver = new IntersectionObserver(entries => {
+new IntersectionObserver((entries, obs) => {
   entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.querySelectorAll('.stat-number').forEach(el => {
-        animateCounter(el, +el.dataset.target);
-      });
-      heroObserver.unobserve(entry.target);
-    }
+    if (!entry.isIntersecting) return;
+    entry.target.querySelectorAll('.counter').forEach(el => {
+      animCounter(el, +el.dataset.target);
+    });
+    obs.unobserve(entry.target);
   });
-}, { threshold: 0.3 });
+}, { threshold: 0.3 }).observe(document.querySelector('.hero-stats'));
 
-const heroStats = document.querySelector('.hero-stats');
-if (heroStats) heroObserver.observe(heroStats);
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  8. Reveal on scroll                                                        */
-/* ────────────────────────────────────────────────────────────────────────── */
-['.service-card', '.research-card', '.testimonial-card',
- '.metric-item', '.about-text', '.about-visual', '.contact-text', '.contact-form'
-].forEach(selector => {
-  document.querySelectorAll(selector).forEach((el, i) => {
-    el.classList.add('reveal');
-    if (i % 3 === 1) el.classList.add('reveal-delay-1');
-    if (i % 3 === 2) el.classList.add('reveal-delay-2');
-  });
-});
-
-const revealObserver = new IntersectionObserver(entries => {
+/* ────────────────────────────────────────────────────────────────────────
+   9. Scroll reveal — IntersectionObserver
+──────────────────────────────────────────────────────────────────────── */
+const revealObserver = new IntersectionObserver((entries, obs) => {
   entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-      revealObserver.unobserve(entry.target);
-    }
+    if (!entry.isIntersecting) return;
+    entry.target.classList.add('visible');
+    obs.unobserve(entry.target);
   });
-}, { threshold: 0.12 });
+}, { threshold: 0.1 });
 
 document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  9. Mobile hamburger                                                        */
-/* ────────────────────────────────────────────────────────────────────────── */
-document.getElementById('hamburger').addEventListener('click', () => {
-  const navLinks = document.querySelector('.nav-links');
-  const open = navLinks.style.display === 'flex';
-  Object.assign(navLinks.style, {
-    display:       open ? 'none' : 'flex',
-    flexDirection: 'column',
-    position:      'absolute',
-    top:           '70px',
-    left:          '0',
-    right:         '0',
-    background:    'rgba(5,8,16,0.97)',
-    padding:       '1rem 2rem',
-    borderBottom:  '1px solid rgba(255,255,255,0.07)',
-  });
-});
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  10. Contact form (demo)                                                    */
-/* ────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────
+   10. Contact form — demo submit with disabled state per skill
+──────────────────────────────────────────────────────────────────────── */
 document.getElementById('contact-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const btn = this.querySelector('button[type="submit"]');
   btn.textContent = 'Sending…';
-  btn.disabled = true;
+  btn.disabled = true;           /* disable during async per skill */
+  btn.setAttribute('aria-busy', 'true');
+
   setTimeout(() => {
-    btn.textContent = 'Message sent! We\'ll be in touch.';
-    btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+    btn.textContent = 'Message sent — we\'ll be in touch!';
+    btn.style.background = '#22c55e';
+    btn.style.color = '#000';
+    btn.removeAttribute('aria-busy');
   }, 1400);
 });
