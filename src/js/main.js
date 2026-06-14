@@ -49,7 +49,7 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
 
   const ptGeo = new THREE.BufferGeometry();
   ptGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const ptMat = new THREE.PointsMaterial({ size: 2.0, color: 0x00e5ff, transparent: true, opacity: 0.8, sizeAttenuation: true });
+  const ptMat = new THREE.PointsMaterial({ size: 2.0, color: 0xC2275A, transparent: true, opacity: 0.8, sizeAttenuation: true });
   const points = new THREE.Points(ptGeo, ptMat);
   scene.add(points);
 
@@ -58,7 +58,7 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   scene.add(lineGrp);
 
   if (!REDUCED) {
-    const lMat = new THREE.LineBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.07 });
+    const lMat = new THREE.LineBasicMaterial({ color: 0x8B1A40, transparent: true, opacity: 0.07 });
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
         const dx = nodeData[i].ox - nodeData[j].ox;
@@ -135,7 +135,7 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   camera.position.z = 420;
 
   const g = new THREE.TorusKnotGeometry(130, 38, 180, 18);
-  const m = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.055 });
+  const m = new THREE.MeshBasicMaterial({ color: 0xC2275A, wireframe: true, transparent: true, opacity: 0.055 });
   const torus = new THREE.Mesh(g, m);
   scene.add(torus);
 
@@ -182,10 +182,10 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
     return mesh;
   }
 
-  const outer = shell(1.32, 3, 0x00e5ff, 0.1);
-  const mid   = shell(1.06, 3, 0x7c3aed, 0.16);
-  const inner = shell(0.76, 2, 0x00e5ff, 0.25);
-  const core  = shell(0.38, 1, 0x22c55e, 0.55);
+  const outer = shell(1.32, 3, 0xC2275A, 0.1);
+  const mid   = shell(1.06, 3, 0x8B1A40, 0.16);
+  const inner = shell(0.76, 2, 0xF4A0B8, 0.25);
+  const core  = shell(0.38, 1, 0xE8B96A, 0.55);
 
   /* Surface nodes */
   const nodePts = [];
@@ -200,13 +200,13 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
     ));
   }
   const ptsGeo = new THREE.BufferGeometry().setFromPoints(nodePts);
-  const ptsMat = new THREE.PointsMaterial({ size: 0.032, color: 0x00e5ff, transparent: true, opacity: 0.85 });
+  const ptsMat = new THREE.PointsMaterial({ size: 0.032, color: 0xC2275A, transparent: true, opacity: 0.85 });
   const pts    = new THREE.Points(ptsGeo, ptsMat);
   scene.add(pts);
 
   /* Pulse ring — green (CTA color) */
   const ringGeo = new THREE.RingGeometry(1.0, 1.04, 64);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xC2275A, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
   const ring    = new THREE.Mesh(ringGeo, ringMat);
   scene.add(ring);
 
@@ -273,7 +273,7 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pa, 3));
-  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.6, color: 0x7c3aed, transparent: true, opacity: 0.6 })));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.6, color: 0xF4A0B8, transparent: true, opacity: 0.6 })));
 
   function resize() {
     const w = canvas.parentElement.clientWidth;
@@ -324,18 +324,18 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
   camera.lookAt(0, 0, 0);
 
   const GRID = 28, STEP = 32, HALF = (GRID * STEP) / 2;
-  const accent = [0x00e5ff, 0x22c55e];
+  const accent = [0xC2275A, 0x8B1A40];
 
   for (let i = 0; i <= GRID; i++) {
     const x  = i * STEP - HALF;
-    const c  = i % 5 === 0 ? accent[0] : 0x111118;
+    const c  = i % 5 === 0 ? accent[0] : 0x180810;
     const op = i % 5 === 0 ? 0.28 : 0.1;
     const g  = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0,-HALF), new THREE.Vector3(x,0,HALF)]);
     scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: op })));
   }
   for (let j = 0; j <= GRID; j++) {
     const z  = j * STEP - HALF;
-    const c  = j % 5 === 0 ? 0x7c3aed : 0x111118;
+    const c  = j % 5 === 0 ? 0x8B1A40 : 0x180810;
     const op = j % 5 === 0 ? 0.28 : 0.1;
     const g  = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-HALF,0,z), new THREE.Vector3(HALF,0,z)]);
     scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: op })));
@@ -343,7 +343,7 @@ function lerp(a, b, t)  { return a + (b - a) * t; }
 
   /* Floating orbs — use skill accent colors */
   const orbs = [];
-  const orbColors = [0x00e5ff, 0x7c3aed, 0x22c55e];
+  const orbColors = [0xC2275A, 0xF4A0B8, 0xE8B96A];
   for (let k = 0; k < 12; k++) {
     const r    = rand(2, 5);
     const mesh = new THREE.Mesh(
@@ -459,8 +459,8 @@ document.getElementById('contact-form').addEventListener('submit', function(e) {
 
   setTimeout(() => {
     btn.textContent = 'Message sent — we\'ll be in touch!';
-    btn.style.background = '#22c55e';
-    btn.style.color = '#000';
+    btn.style.background = '#C2275A';
+    btn.style.color = '#fff';
     btn.removeAttribute('aria-busy');
   }, 1400);
 });
